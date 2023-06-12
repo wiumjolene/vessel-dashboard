@@ -43,7 +43,7 @@ class GetData:
             FROM agrihub.vessels_vessel_position_latest latest
             LEFT JOIN dim_vessels ON (latest.vessel_id=dim_vessels.id_vessel)
 			LEFT JOIN (
-				SELECT st.commodity, st.id_vessel, sum(st.eqv_ctns) as eqv_ctns FROM agrihub.SummaryTableTest20230508 st
+				SELECT st.commodity, st.id_vessel, sum(st.eqv_ctns) as eqv_ctns FROM agrihub.SummaryTable st
 				LEFT JOIN vessels_sail_date ON (st.sail_date_id=vessels_sail_date.id)
 				WHERE vessels_sail_date.shipped_date > DATE_SUB(now(), INTERVAL 21 DAY)
 				AND vessels_sail_date.shipped_date_confirmed=1

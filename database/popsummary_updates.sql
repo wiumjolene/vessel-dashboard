@@ -16,7 +16,8 @@ BEGIN
      SELECT commodity, start_date,End_date, Season , Use_Airfreight_tbl, Include_Airfreight
      FROM Report_seasons a, (SELECT DISTINCT reportcomm FROM dim_variety) AS b
      WHERE  Start_date <= CURDATE() AND End_date >= CURDATE()
-     AND a.Commodity = b.reportcomm;
+     AND a.Commodity = b.reportcomm
+     ;
 
    #declare handle 
    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
@@ -32,14 +33,14 @@ BEGIN
     --  select lComm , lstart_date, lend_date,lseason;
 
     -- delete existing data.
-      DELETE FROM SummaryTableTest20230508 
+      DELETE FROM SummaryTable 
       WHERE (commodity = lComm and seasons = lseason)
       OR (seasons is NULL);
 
   if lComm = 'DR' 
   then
 
-       INSERT INTO SummaryTableTest20230508 (commodity, id_variety, shipped_week, iso_port, port_country, port_region, exporter_region,
+       INSERT INTO SummaryTable (commodity, id_variety, shipped_week, iso_port, port_country, port_region, exporter_region,
           var_grp, comm_grp, act_ctns, eqv_ctns, plt_qty, load_port, vesselname, id_port, seasons,mass, grade, voyage, transport, size_count,
           id_vessel, combo_region, shipped_month)
        SELECT b.Commodity, a.id_variety, 0, a.id_port, a.target_country, a.target_region, a.target_region, b.VarGrp, b.CommGroup, 0,0,0,a.load_port_derived,
@@ -58,7 +59,7 @@ BEGIN
 
     -- insert new data
 
-      INSERT INTO  SummaryTableTest20230508 (commodity, id_variety, shipped_week,
+      INSERT INTO  SummaryTable (commodity, id_variety, shipped_week,
             shipped_week_za, shipped_week_pol, iso_port, port_country, 
             port_region, exporter_region, combo_region, comm_grp, load_port, 
             vesselname, id_port,seasons, grade,voyage, transport, size_count, 
@@ -355,7 +356,7 @@ BEGIN
      if luse_airfreight_tbl = 'Y' 
      then
 
-       INSERT INTO  SummaryTableTest20230508 (commodity,id_variety, shipped_week, shipped_week_za, shipped_week_pol,
+       INSERT INTO  SummaryTable (commodity,id_variety, shipped_week, shipped_week_za, shipped_week_pol,
           iso_port,port_country, port_region, exporter_region, combo_region,
           comm_grp, load_port, vesselname, id_port, seasons,
           grade, voyage,transport, size_count, id_vessel, act_ctns,eqv_ctns, plt_qty,mass)
