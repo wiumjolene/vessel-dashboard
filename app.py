@@ -1,8 +1,10 @@
 import dash
 from dash import dcc, html, Input, Output
+from flask_caching import Cache
 import dash_bootstrap_components as dbc
 import json
 import pandas as pd
+import uuid
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -15,9 +17,32 @@ gd = GetData()
 
 
 dash_app = dash.Dash(__name__,
-                     external_stylesheets=[dbc.themes.SPACELAB, dbc.icons.FONT_AWESOME])
+                     external_stylesheets=[dbc.themes.SPACELAB, 
+                                           dbc.icons.FONT_AWESOME])
 dash_app.title = 'Agrihub Vessels'
+cache = Cache(dash_app.server, config={
+    'CACHE_TYPE': 'redis',
+    # Note that filesystem cache doesn't work on systems with ephemeral
+    # filesystems like Heroku.
+    'CACHE_TYPE': 'filesystem',
+    'CACHE_DIR': 'cache-directory',
+
+    # should be equal to maximum number of users on the app at a single time
+    # higher numbers will store more data in the filesystem / redis cache
+    'CACHE_THRESHOLD': 200
+})
+
 app = dash_app.server
+
+def get_dataframe(session_id):
+    @cache.memoize()
+    def query_and_serialize_data(session_id):
+        # expensive or user/session-unique data processing step goes here
+        df = gd.get_vessel_commodity()
+
+        return df.to_json()
+
+    return pd.read_json(query_and_serialize_data(session_id))
 
 ########################################################################
 # Define dashboard aspects
@@ -81,7 +106,7 @@ footer = html.Div(
 ########################################################################
 # Define app
 ########################################################################
-dash_app.layout = dbc.Container(
+""" dash_app.layout = dbc.Container(
     [
         dcc.Store(id='intermediate-value'),
         dbc.Row(
@@ -113,6 +138,43 @@ dash_app.layout = dbc.Container(
     fluid=True,
 )
 
+ """
+def serve_layout():
+    session_id = str(uuid.uuid4())
+
+    return dbc.Container(
+        [
+            dcc.Store(data=session_id, id='session-id'),
+            dbc.Row(
+                dbc.Col(
+                    html.H2(
+                        "Agrihub Active Vessels",
+                        className="text-center bg-primary text-white p-2",
+                    ),
+                )
+            ),
+            dbc.Row(
+                [
+                    dbc.Col([map_card,
+                            next_port_card
+                            ],
+                            width=12,
+                            lg=6,
+                            className="pt-4",
+                            ),
+                    dbc.Col(commodity_card, width=12, lg=4, className="mt-4"),
+                    dbc.Col([commdodity_select_card, vessel_select_card,
+                            ], width=12, lg=2, className="mt-4 border"),
+
+                ],
+                className="ms-1",
+            ),
+            dbc.Row(dbc.Col(footer)),
+        ],
+        fluid=True,
+    )
+dash_app.layout = serve_layout
+
 
 ########################################################################
 # Define callbacks for interactivity
@@ -120,33 +182,24 @@ dash_app.layout = dbc.Container(
 # Get data
 #data = gd.get_vessel_commodity()
 
-@dash_app.callback(
-    Output('intermediate-value', 'data'),
-    Input('vessel-dropdown', 'value'),
-    Input('commodity-dropdown', 'value'))
-def clean_data(vessel_value, commodity_value):
-    df_4 = gd.get_vessel_commodity()
+def clean_data(session_id, commodity='ALL', vessel='ALL'):
+    df_4 = get_dataframe(session_id)
 
-    if commodity_value != 'ALL':
-        df_4 = df_4[df_4['commodity'] == commodity_value]
+    if commodity != 'ALL':
+        df_4 = df_4[df_4['commodity'] == commodity]
 
-    if vessel_value != 'ALL':
-        df_4 = df_4[df_4['vessel_name'] == vessel_value]
+    if vessel != 'ALL':
+        df_4 = df_4[df_4['vessel_name'] == vessel]
 
-    datasets = {
-        'df_4': df_4.to_json(orient='split', date_format='iso'),
-    }
-
-    return json.dumps(datasets)
-
+    return df_4
 
 # Callback to manage commodity dropdown
 @dash_app.callback(
     Output('commodity-dropdown', 'options'),
-    Input('intermediate-value', 'data'),
-    Input('vessel-dropdown', 'value')
+    Input('session-id', 'data'),
+    Input('vessel-dropdown', 'value'),
 )
-def update_com_dropdown(jsonified_cleaned_data, vessel):
+def update_com_dropdown(session_id, vessel):
     """ Update commodity dropdown based on vessel
 
     Parameters
@@ -160,8 +213,7 @@ def update_com_dropdown(jsonified_cleaned_data, vessel):
     commlist : list
         A list of commodities on the selected vessels.
     """
-    datasets = json.loads(jsonified_cleaned_data)
-    table_df = pd.read_json(datasets['df_4'], orient='split')
+    table_df=clean_data(session_id, vessel=vessel)
 
     commlist = list(table_df['commodity'].unique())
     commlist.sort()
@@ -172,10 +224,10 @@ def update_com_dropdown(jsonified_cleaned_data, vessel):
 # Callback to manage vessel dropdown
 @dash_app.callback(
     Output('vessel-dropdown', 'options'),
-    Input('intermediate-value', 'data'),
-    Input('commodity-dropdown', 'value')
+    Input('session-id', 'data'),
+    Input('commodity-dropdown', 'value'),
 )
-def update_ves_dropdown(jsonified_cleaned_data, commodity):
+def update_ves_dropdown(session_id, commodity):
     """ Update vessel dropdown based on commodity
 
     Parameters
@@ -189,8 +241,9 @@ def update_ves_dropdown(jsonified_cleaned_data, commodity):
     vessellist : list
         A list of vessels on the selected commodities.
     """
-    datasets = json.loads(jsonified_cleaned_data)
-    table_df = pd.read_json(datasets['df_4'], orient='split')
+    #datasets = json.loads(jsonified_cleaned_data)
+    #table_df = pd.read_json(datasets['df_4'], orient='split')
+    table_df=clean_data(session_id, commodity=commodity)
 
     vessellist = list(table_df['vessel_name'].unique())
     vessellist.sort()
@@ -202,11 +255,11 @@ def update_ves_dropdown(jsonified_cleaned_data, commodity):
 # Update vessel-commodity bar graph
 @dash_app.callback(
     Output('commodity-table', 'children'),
-    Input('intermediate-value', 'data'),
+    Input('session-id', 'data'),
     Input('commodity-dropdown', 'value'),
-    Input('vessel-dropdown', 'value')
+    Input('vessel-dropdown', 'value'),
 )
-def update_com_table(jsonified_cleaned_data, commodity, vessel):
+def update_com_table(session_id, commodity, vessel):
     """ Generates bar graph indicating commodity volumes by vessel
 
     Parameters
@@ -223,8 +276,9 @@ def update_com_table(jsonified_cleaned_data, commodity, vessel):
     graph : dash core graph component
         An HTML package of a barchart
     """
-    datasets = json.loads(jsonified_cleaned_data)
-    table_df = pd.read_json(datasets['df_4'], orient='split')
+    #datasets = json.loads(jsonified_cleaned_data)
+    #table_df = pd.read_json(datasets['df_4'], orient='split')
+    table_df=clean_data(session_id, commodity, vessel)
 
     table_df = table_df.sort_values(by='vessel_name', ascending=False)
     vessels = table_df.vessel_name.unique()
@@ -270,11 +324,11 @@ def update_com_table(jsonified_cleaned_data, commodity, vessel):
 # Update vessel next port location and ETA
 @dash_app.callback(
     Output('vessel-table', 'children'),
-    Input('intermediate-value', 'data'),
+    Input('session-id', 'data'),
     Input('commodity-dropdown', 'value'),
-    Input('vessel-dropdown', 'value')
+    Input('vessel-dropdown', 'value'),
 )
-def update_vessel_table(jsonified_cleaned_data, commodity, vessel):
+def update_vessel_table(session_id, commodity, vessel):
     """ Generates table indicating Next Port by vessel
 
     Parameters
@@ -291,8 +345,9 @@ def update_vessel_table(jsonified_cleaned_data, commodity, vessel):
     table : dash core table component
         An HTML package of a table
     """
-    datasets = json.loads(jsonified_cleaned_data)
-    table_df = pd.read_json(datasets['df_4'], orient='split')
+    #datasets = json.loads(jsonified_cleaned_data)
+    #table_df = pd.read_json(datasets['df_4'], orient='split')
+    table_df=clean_data(session_id, commodity, vessel)
 
     table_df = features.vessel_table(table_df)
     table = dbc.Table.from_dataframe(
@@ -304,11 +359,11 @@ def update_vessel_table(jsonified_cleaned_data, commodity, vessel):
 # Update map visual
 @dash_app.callback(
     Output('map-vis', 'children'),
-    Input('intermediate-value', 'data'),
+    Input('session-id', 'data'),
     Input('commodity-dropdown', 'value'),
-    Input('vessel-dropdown', 'value')
+    Input('vessel-dropdown', 'value'),
 )
-def update_map(jsonified_cleaned_data, commodity, vessel):
+def update_map(session_id, commodity, vessel):
     """ Generates MAP visual to locate all active vessels
 
     Parameters
@@ -325,8 +380,10 @@ def update_map(jsonified_cleaned_data, commodity, vessel):
     map : dash core table component
         An HTML package of a map visual
     """
-    datasets = json.loads(jsonified_cleaned_data)
-    table_df = pd.read_json(datasets['df_4'], orient='split')
+    #datasets = json.loads(jsonified_cleaned_data)
+    #table_df = pd.read_json(datasets['df_4'], orient='split')
+    table_df=clean_data(session_id, commodity, vessel)
+
 
     map = dcc.Graph(figure=features.map_viz(table_df), config={
                     'displayModeBar': False}, className="mb-2")
