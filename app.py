@@ -1,6 +1,8 @@
 import dash
 from dash import dcc, html, Input, Output
 import dash_bootstrap_components as dbc
+import json
+import pandas as pd
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -24,7 +26,7 @@ app = dash_app.server
 commdodity_select_card = dbc.Card(
     [dbc.CardHeader("Select Commodity"),
      dbc.CardBody(dcc.Dropdown(
-         [], 'AP', clearable=False, id='commodity-dropdown')),
+         [], 'ALL', clearable=False, id='commodity-dropdown')),
      ], className="mt-4",
 )
 
@@ -81,6 +83,7 @@ footer = html.Div(
 ########################################################################
 dash_app.layout = dbc.Container(
     [
+        dcc.Store(id='intermediate-value'),
         dbc.Row(
             dbc.Col(
                 html.H2(
@@ -115,14 +118,35 @@ dash_app.layout = dbc.Container(
 # Define callbacks for interactivity
 ########################################################################
 # Get data
-data = gd.get_vessel_commodity()
+#data = gd.get_vessel_commodity()
+
+@dash_app.callback(
+    Output('intermediate-value', 'data'),
+    Input('vessel-dropdown', 'value'),
+    Input('commodity-dropdown', 'value'))
+def clean_data(vessel_value, commodity_value):
+    df_4 = gd.get_vessel_commodity()
+
+    if commodity_value != 'ALL':
+        df_4 = df_4[df_4['commodity'] == commodity_value]
+
+    if vessel_value != 'ALL':
+        df_4 = df_4[df_4['vessel_name'] == vessel_value]
+
+    datasets = {
+        'df_4': df_4.to_json(orient='split', date_format='iso'),
+    }
+
+    return json.dumps(datasets)
+
 
 # Callback to manage commodity dropdown
 @dash_app.callback(
     Output('commodity-dropdown', 'options'),
+    Input('intermediate-value', 'data'),
     Input('vessel-dropdown', 'value')
 )
-def update_com_dropdown(vessel):
+def update_com_dropdown(jsonified_cleaned_data, vessel):
     """ Update commodity dropdown based on vessel
 
     Parameters
@@ -136,12 +160,8 @@ def update_com_dropdown(vessel):
     commlist : list
         A list of commodities on the selected vessels.
     """
-
-    if vessel == 'ALL':
-        table_df = data
-
-    else:
-        table_df = data[data['vessel_name'] == vessel]
+    datasets = json.loads(jsonified_cleaned_data)
+    table_df = pd.read_json(datasets['df_4'], orient='split')
 
     commlist = list(table_df['commodity'].unique())
     commlist.sort()
@@ -152,9 +172,10 @@ def update_com_dropdown(vessel):
 # Callback to manage vessel dropdown
 @dash_app.callback(
     Output('vessel-dropdown', 'options'),
+    Input('intermediate-value', 'data'),
     Input('commodity-dropdown', 'value')
 )
-def update_ves_dropdown(commodity):
+def update_ves_dropdown(jsonified_cleaned_data, commodity):
     """ Update vessel dropdown based on commodity
 
     Parameters
@@ -168,17 +189,8 @@ def update_ves_dropdown(commodity):
     vessellist : list
         A list of vessels on the selected commodities.
     """
-    if commodity == 'ALL':
-        com_df = data
-
-    else:
-        com_df = data[data['commodity'] == commodity]
-
-    if commodity == 'ALL':
-        table_df = com_df
-
-    else:
-        table_df = com_df[com_df['commodity'] == commodity]
+    datasets = json.loads(jsonified_cleaned_data)
+    table_df = pd.read_json(datasets['df_4'], orient='split')
 
     vessellist = list(table_df['vessel_name'].unique())
     vessellist.sort()
@@ -190,10 +202,11 @@ def update_ves_dropdown(commodity):
 # Update vessel-commodity bar graph
 @dash_app.callback(
     Output('commodity-table', 'children'),
+    Input('intermediate-value', 'data'),
     Input('commodity-dropdown', 'value'),
     Input('vessel-dropdown', 'value')
 )
-def update_com_table(commodity, vessel):
+def update_com_table(jsonified_cleaned_data, commodity, vessel):
     """ Generates bar graph indicating commodity volumes by vessel
 
     Parameters
@@ -210,17 +223,8 @@ def update_com_table(commodity, vessel):
     graph : dash core graph component
         An HTML package of a barchart
     """
-    if commodity == 'ALL':
-        com_df = data
-
-    else:
-        com_df = data[data['commodity'] == commodity]
-
-    if vessel == 'ALL':
-        table_df = com_df
-
-    else:
-        table_df = com_df[com_df['vessel_name'] == vessel]
+    datasets = json.loads(jsonified_cleaned_data)
+    table_df = pd.read_json(datasets['df_4'], orient='split')
 
     table_df = table_df.sort_values(by='vessel_name', ascending=False)
     vessels = table_df.vessel_name.unique()
@@ -266,10 +270,11 @@ def update_com_table(commodity, vessel):
 # Update vessel next port location and ETA
 @dash_app.callback(
     Output('vessel-table', 'children'),
+    Input('intermediate-value', 'data'),
     Input('commodity-dropdown', 'value'),
     Input('vessel-dropdown', 'value')
 )
-def update_vessel_table(commodity, vessel):
+def update_vessel_table(jsonified_cleaned_data, commodity, vessel):
     """ Generates table indicating Next Port by vessel
 
     Parameters
@@ -286,17 +291,8 @@ def update_vessel_table(commodity, vessel):
     table : dash core table component
         An HTML package of a table
     """
-    if commodity == 'ALL':
-        com_df = data
-
-    else:
-        com_df = data[data['commodity'] == commodity]
-
-    if vessel == 'ALL':
-        table_df = com_df
-
-    else:
-        table_df = com_df[com_df['vessel_name'] == vessel]
+    datasets = json.loads(jsonified_cleaned_data)
+    table_df = pd.read_json(datasets['df_4'], orient='split')
 
     table_df = features.vessel_table(table_df)
     table = dbc.Table.from_dataframe(
@@ -308,10 +304,11 @@ def update_vessel_table(commodity, vessel):
 # Update map visual
 @dash_app.callback(
     Output('map-vis', 'children'),
+    Input('intermediate-value', 'data'),
     Input('commodity-dropdown', 'value'),
     Input('vessel-dropdown', 'value')
 )
-def update_map(commodity, vessel):
+def update_map(jsonified_cleaned_data, commodity, vessel):
     """ Generates MAP visual to locate all active vessels
 
     Parameters
@@ -328,17 +325,8 @@ def update_map(commodity, vessel):
     map : dash core table component
         An HTML package of a map visual
     """
-    if commodity == 'ALL':
-        com_df = data
-
-    else:
-        com_df = data[data['commodity'] == commodity]
-
-    if vessel == 'ALL':
-        table_df = com_df
-
-    else:
-        table_df = com_df[com_df['vessel_name'] == vessel]
+    datasets = json.loads(jsonified_cleaned_data)
+    table_df = pd.read_json(datasets['df_4'], orient='split')
 
     map = dcc.Graph(figure=features.map_viz(table_df), config={
                     'displayModeBar': False}, className="mb-2")

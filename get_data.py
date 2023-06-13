@@ -58,14 +58,18 @@ class GetData:
         return df
 
     def get_colour(self, commodity):
-        dic = {
-            'AP': '#a9dfce',
-            'PR': '#98c8b9',
-            'GR': '#fedd8e',
-            'OR': '#f9b9aa',
-            'GF': '#e0a699',
-            'LE': '#c79488',
-            'SC': '#fac7bb',
+        try:
+            dic = {
+                'AP': '#a9dfce',
+                'PR': '#98c8b9',
+                'GR': '#fedd8e',
+                'OR': '#f9b9aa',
+                'GF': '#e0a699',
+                'LE': '#c79488',
+                'SC': '#fac7bb',          
 
-        }
-        return dic[commodity]
+            }
+            col = dic[commodity]
+        except:
+            col = '#C0C0C0'
+        return col
