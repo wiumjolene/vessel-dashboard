@@ -79,11 +79,12 @@ class MakeFeatures:
         return fig
     
     def vessel_table(self, df):
-        df = df[['vessel_name', 'next_port_unlocode', 'next_port_eta']]
+        df = df.sort_values(by='next_port_eta')
+        df = df[['vessel_name', 'next_port_unlocode', 'eta_use']]
         df = df.drop_duplicates()
         df = df.dropna()
-        df = df.rename(columns={'vessel_name':'VesselName','next_port_unlocode':'NextPort','next_port_eta':'ETA'})
-        df = df.sort_values(by='ETA')
+        
+        df = df.rename(columns={'vessel_name':'VesselName','next_port_unlocode':'NextPort','eta_use':'ETA'})
         
         return df
     

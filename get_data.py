@@ -37,6 +37,9 @@ class GetData:
 					, CONCAT(CONCAT(latest.next_port_unlocode, ": "), CONCAT(CONCAT(CONCAT(DATE(latest.eta_calc),' at '), HOUR(latest.eta_calc), ':00')))
                     , 'No next port information available')
 					as next_eta
+                , IF(latest.eta_calc > '2020-01-01'
+					, CONCAT(CONCAT(DATE(latest.eta_calc),' '), HOUR(latest.eta_calc), ':00'), '')
+					as eta_use
                 , latest.timestamp as updated
                 , summary.commodity
                 , ROUND(summary.eqv_ctns, 1) as stdunits
