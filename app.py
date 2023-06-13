@@ -106,39 +106,6 @@ footer = html.Div(
 ########################################################################
 # Define app
 ########################################################################
-""" dash_app.layout = dbc.Container(
-    [
-        dcc.Store(id='intermediate-value'),
-        dbc.Row(
-            dbc.Col(
-                html.H2(
-                    "Agrihub Active Vessels",
-                    className="text-center bg-primary text-white p-2",
-                ),
-            )
-        ),
-        dbc.Row(
-            [
-                dbc.Col([map_card,
-                        next_port_card
-                         ],
-                        width=12,
-                        lg=6,
-                        className="pt-4",
-                        ),
-                dbc.Col(commodity_card, width=12, lg=4, className="mt-4"),
-                dbc.Col([commdodity_select_card, vessel_select_card,
-                         ], width=12, lg=2, className="mt-4 border"),
-
-            ],
-            className="ms-1",
-        ),
-        dbc.Row(dbc.Col(footer)),
-    ],
-    fluid=True,
-)
-
- """
 def serve_layout():
     session_id = str(uuid.uuid4())
 
@@ -180,8 +147,6 @@ dash_app.layout = serve_layout
 # Define callbacks for interactivity
 ########################################################################
 # Get data
-#data = gd.get_vessel_commodity()
-
 def clean_data(session_id, commodity='ALL', vessel='ALL'):
     df_4 = get_dataframe(session_id)
 
