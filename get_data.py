@@ -55,6 +55,8 @@ class GetData:
         """
         df = self.database_instance.select_query_ssh(sql)
         df['stdunits'] = df['stdunits'].astype(int)
+        df['next_port_eta'] = pd.to_datetime(df['next_port_eta'])
+        #df['eta_calc'] = pd.to_datetime(df['eta_calc'])
         return df
 
     def get_colour(self, commodity):
